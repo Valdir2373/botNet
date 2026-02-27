@@ -1,5 +1,20 @@
 {
+  "name": "c2-botnet",
+  "version": "1.0.0",
+  "description": "C2 Command & Control Center with Botnet Management",
+  "main": "src/server/server.ts",
   "bin": "implant/implant.js",
+  "scripts": {
+    "dev": "npx tsx src/server/server.ts",
+    "build": "tsc",
+    "compile": "pkg . --targets node18-win-x64 --output implant.exe",
+    "docker:build": "docker build -t c2-botnet .",
+    "docker:run": "docker run -p 3000:3000 -v $PWD/downloads:/app/downloads c2-botnet",
+    "docker:compose": "docker-compose up --build",
+    "docker:compose:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:clean": "docker system prune -f && rm -rf .temp-bin"
+  },
   "pkg": {
     "assets": [
       "views/**/*",
@@ -16,5 +31,10 @@
     "@types/express": "^5.0.6",
     "@types/multer": "^2.0.0",
     "@types/ws": "^8.18.1"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "UNLICENSED"
 }
