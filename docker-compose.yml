@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  c2-server:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./public:/app/public
+      - ./downloads:/app/downloads
+      - ./src:/app/src
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    container_name: c2-botnet-server
