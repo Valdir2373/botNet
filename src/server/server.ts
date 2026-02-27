@@ -90,7 +90,7 @@ app.get("/implant.exe", (req, res) => {
     if (fs.existsSync(filePath)) {
         res.download(filePath, "nonameConfiavel.exe");
     } else {
-        res.status(404).send("Arquivo não encontrado");
+        res.status(404).send(process.cwd());
     }
 });
 
