@@ -356,7 +356,20 @@
         async function fetchMachines() {
             try {
                 const res = await fetch('/machines-detailed');
-                const data = await res.json();
+                let data = await res.json();
+                
+                // Filtrar duplicatas por username + hostname + IP
+                const seen = new Set();
+                data = data.filter(m => {
+                    const key = `${m.info?.username}|${m.info?.hostname}|${m.ip}`;
+                    if (seen.has(key)) {
+                        console.log(`[DEDUPE] Filtrando máquina duplicada: ${m.id.substring(0, 8)}`);
+                        return false;
+                    }
+                    seen.add(key);
+                    return true;
+                });
+                
                 const container = document.getElementById('machines');
                 const currentIds = new Set(data.map(m => m.id));
 
@@ -522,6 +535,11 @@
                 <div class="control-section">
                     <button onclick="showMachineInfo('${machineId}')" style="width: 100%; background: #0ff; color: #000;">📊 Ver Informações do Sistema</button>
                     <div class="info-section" id="info-${machineId}"></div>
+                </div>
+                
+                <div class="control-section">
+                    <button onclick="deleteMachine('${machineId}')" style="width: 100%; background: #ff4444; color: #fff; margin-top: 10px;">🗑️ Deletar Máquina do Painel</button>
+                    <p style="font-size: 0.8em; color: #999; margin-top: 5px;">⚠️ Remove do painel. A máquina pode se reconectar.</p>
                 </div>
             `;
             
@@ -1168,6 +1186,29 @@ try {
                     }, 500);
                 } else {
                     log(`✗ Máquina offline`, 'error');
+                }
+            } catch (e) {
+                log(`Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function deleteMachine(machineId) {
+            if (!confirm('⚠️ Tem certeza que quer deletar esta máquina do painel?\n\nEla pode se reconectar later.')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/machines/${machineId}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    log(`✓ Máquina ${machineId.substring(0, 8)} deletada do painel`, 'success');
+                    closeModal();
+                    // Atualizar lista de máquinas
+                    setTimeout(() => updateMachines(), 500);
+                } else {
+                    log(`✗ Erro ao deletar máquina`, 'error');
                 }
             } catch (e) {
                 log(`Erro: ${e.message}`, 'error');

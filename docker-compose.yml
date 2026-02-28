@@ -9,6 +9,7 @@ services:
       - ./public:/app/public
       - ./downloads:/app/downloads
       - ./src:/app/src
+      - ./implant.exe:/app/public/implant.exe
     environment:
       - NODE_ENV=production
     restart: unless-stopped

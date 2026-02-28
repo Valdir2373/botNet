@@ -5,8 +5,8 @@ WORKDIR /app
 # Copiar arquivos de dependência
 COPY package.json package-lock.json ./
 
-# Instalar dependências
-RUN npm install
+# Instalar dependências ignorando platform-specific (node-hide-console-window é Windows-only)
+RUN npm install --ignore-scripts
 
 # Copiar todo o projeto
 COPY . .

